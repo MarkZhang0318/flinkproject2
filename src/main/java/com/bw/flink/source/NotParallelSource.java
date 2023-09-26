@@ -3,7 +3,7 @@ package com.bw.flink.source;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 
 public class NotParallelSource implements SourceFunction<Long> {
-    private long number = 10L;
+    private Long number = 10L;
     private boolean isRunning = true;
     /*
     * 产生数据
