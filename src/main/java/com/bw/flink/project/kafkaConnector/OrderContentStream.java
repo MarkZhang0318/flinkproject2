@@ -1,13 +1,19 @@
 package com.bw.flink.project.kafkaConnector;
 
+import com.bw.flink.project.Content;
+import com.bw.flink.project.FileSource;
 import com.bw.flink.project.OrderData01;
 import com.bw.flink.project.OrderData02;
 import com.bw.flink.project.kafkaConnector.MyKafkaSource;
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.connector.jdbc.JdbcConnectionOptions;
+import org.apache.flink.connector.jdbc.JdbcOutputFormat;
+import org.apache.flink.connector.jdbc.JdbcSink;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.datastream.KeyedStream;
+import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction;
 import org.apache.flink.util.Collector;
@@ -22,26 +28,43 @@ public class OrderContentStream {
     public static void main(String[] args) throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         //1.获取数据源
-        //DataStreamSource<String> source1 = env.addSource(new FileSource(Content.filePath1));
-        //DataStreamSource<String> source2 = env.addSource(new FileSource(Content.filePath2));
-        MyKafkaSource myKafkaSource01 = new MyKafkaSource("hadoop5:9092", "orderInfo01", "orderInfo01");
-        MyKafkaSource myKafkaSource02 = new MyKafkaSource("hadoop5:9092", "orderInfo01", "orderInfo02");
+        DataStreamSource<String> source1 = env.addSource(new FileSource(Content.filePath1));
+        DataStreamSource<String> source2 = env.addSource(new FileSource(Content.filePath2));
 
-        DataStreamSource<String> source1 = env.addSource(myKafkaSource01.getKafkaSource());
-        DataStreamSource<String> source2 = env.addSource(myKafkaSource02.getKafkaSource());
 
-        /*source1.print();
-        source2.print();*/
+        //MyKafkaSource myKafkaSource01 = new MyKafkaSource("hadoop5:9092", "orderInfo01", "orderInfo01");
+        //MyKafkaSource myKafkaSource02 = new MyKafkaSource("hadoop5:9092", "orderInfo01", "orderInfo02");
+        //
+        //DataStreamSource<String> source1 = env.addSource(myKafkaSource01.getKafkaSource());
+        //DataStreamSource<String> source2 = env.addSource(myKafkaSource02.getKafkaSource());
+
+        //source1.print();
+        //source2.print();
 
         //2.利用包装类中的方法处理数据,并根据id的值进行分组
         KeyedStream<OrderData01, String> orDa01Stream = source1.map(OrderData01::textToOrderData01).keyBy(OrderData01::getOrderId);
         KeyedStream<OrderData02, String> orDa02Stream = source2.map(OrderData02::textToOrderData02).keyBy(OrderData02::getOrderId);
 
-        //3.利用collect方法将俩哥哥数据流连接起来
-        orDa01Stream.connect(orDa02Stream).flatMap(new OrderDataStreamFunction()).print();
+        //3.利用collect方法将两个数据流连接起来
+
+        SingleOutputStreamOperator<String> result = orDa01Stream.connect(orDa02Stream).flatMap(new OrderDataStreamFunction());
+
+        //将数据存入到Mysql
+        result.addSink(JdbcSink.sink(
+                "INSERT INTO order_result (result) VALUES (?) ",
+                (ps, t) -> {
+                    ps.setString(1, t);
+                },
+                new JdbcConnectionOptions.JdbcConnectionOptionsBuilder()
+                        .withUrl("jdbc:mysql://hadoop5:3306/flink_db?useSSL=false")
+                        .withUsername("root")
+                        .withPassword("hadoop")
+                        .withDriverName("com.mysql.jdbc.Driver")
+                        .build()
+        ));
 
         //执行
-        env.execute("OrderContentStream");
+        env.execute("kafka result write into mysql");
 
     }
 
