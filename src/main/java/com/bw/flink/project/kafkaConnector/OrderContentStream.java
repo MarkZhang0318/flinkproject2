@@ -1,5 +1,7 @@
-package com.bw.flink.project;
+package com.bw.flink.project.kafkaConnector;
 
+import com.bw.flink.project.OrderData01;
+import com.bw.flink.project.OrderData02;
 import com.bw.flink.project.kafkaConnector.MyKafkaSource;
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
@@ -9,18 +11,24 @@ import org.apache.flink.streaming.api.datastream.KeyedStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction;
 import org.apache.flink.util.Collector;
+/*
+* 此处已经可以连接Kafka并读取消息了，但是由于我在给Kafka的topic输入消息的时候是一次性粘贴的，因此多条消息
+* 之间使用了\n换行符连接，看起来这里没法直接将换行符转化为两条数据，因此在数据处理的process里面需要加入一个
+* 根据\n换行符分解字符串的过程，但是这样就得彻底改造整个处理过程，太麻烦了。
+* 所以，思路放在这里，先往下看了，回头有兴趣的时候再来补充下吧。
+* */
 
 public class OrderContentStream {
     public static void main(String[] args) throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         //1.获取数据源
-        DataStreamSource<String> source1 = env.addSource(new FileSource(Content.filePath1));
-        DataStreamSource<String> source2 = env.addSource(new FileSource(Content.filePath2));
-        /*MyKafkaSource myKafkaSource01 = new MyKafkaSource("hadoop5:9092", "orderInfo01", "orderInfo01");
+        //DataStreamSource<String> source1 = env.addSource(new FileSource(Content.filePath1));
+        //DataStreamSource<String> source2 = env.addSource(new FileSource(Content.filePath2));
+        MyKafkaSource myKafkaSource01 = new MyKafkaSource("hadoop5:9092", "orderInfo01", "orderInfo01");
         MyKafkaSource myKafkaSource02 = new MyKafkaSource("hadoop5:9092", "orderInfo01", "orderInfo02");
 
         DataStreamSource<String> source1 = env.addSource(myKafkaSource01.getKafkaSource());
-        DataStreamSource<String> source2 = env.addSource(myKafkaSource02.getKafkaSource());*/
+        DataStreamSource<String> source2 = env.addSource(myKafkaSource02.getKafkaSource());
 
         /*source1.print();
         source2.print();*/
